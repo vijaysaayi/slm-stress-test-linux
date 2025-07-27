@@ -1,0 +1,24 @@
+POST http://localhost:11434/v1/chat/completions
+Content-Type: application/json
+
+{
+    "model": "smollm-135m",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Get me the current time"
+        }
+    ],
+    "functions": [
+        {
+            "name": "get_time",
+            "description": "Returns current time",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    ],
+    "max_new_tokens": 10
+}

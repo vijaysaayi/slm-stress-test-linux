@@ -1,0 +1,39 @@
+POST http://localhost:11434/v1/chat/completions
+Content-Type: application/json
+
+{
+    "model": "smollm-135m",
+    "messages": [
+        {
+            "role": "system",
+            "content": "You are a friendly assistant that answers questions clearly."
+        },
+        {
+            "role": "user",
+            "content": "How many moons does Mars have?"
+        }
+    ],
+    "max_new_tokens": 50,
+    "temperature": 0.7
+}
+
+###
+
+POST http://localhost:11434/v1/chat/completions
+Content-Type: application/json
+
+{
+    "model": "smollm-135m",
+    "messages": [
+        {
+            "role": "system",
+            "content": "You are a friendly assistant that answers questions clearly."
+        },
+        {
+            "role": "user",
+            "content": "Why is the sky blue?"
+        }
+    ],
+    "max_new_tokens": 50,
+    "temperature": 0.7
+}
