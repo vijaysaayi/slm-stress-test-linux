@@ -58,13 +58,24 @@ static TestConfiguration ParseCommandLineArgs(string[] args)
                     break;
                 case "--requests":
                 case "-r":
-                    if (i + 1 < args.Length && int.TryParse(args[++i], out var requests))
-                        config.RequestsPerMinute = requests;
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out var totalRequests))
+                        config.TotalRequests = totalRequests;
+                    break;
+                case "--concurrent":
+                case "-n":
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out var concurrent))
+                        config.ConcurrentRequests = concurrent;
                     break;
                 case "--duration":
                 case "-d":
+                    // Keep for backward compatibility but convert to total requests
                     if (i + 1 < args.Length && int.TryParse(args[++i], out var minutes))
+                    {
                         config.DurationMinutes = minutes;
+                        // Convert legacy format: if using old format, calculate total requests
+                        if (config.TotalRequests == 10) // default value, likely not user-set
+                            config.TotalRequests = config.RequestsPerMinute * minutes;
+                    }
                     break;
                 case "--output":
                 case "-o":
@@ -100,7 +111,8 @@ static void DisplayHelp()
         Console.WriteLine("Options:");
         Console.WriteLine("  -u, --url <url>           Service URL (default: http://localhost:11434)");
         Console.WriteLine("  -c, --container <name>    Container name for monitoring (default: tux-ai-service)");
-        Console.WriteLine("  -r, --requests <count>    Requests per minute (default: 10)");
+        Console.WriteLine("  -r, --requests <count>    Total number of requests to send (default: 10)");
+        Console.WriteLine("  -n, --concurrent <count>  Number of concurrent requests per batch (default: 1)");
         Console.WriteLine("  -d, --duration <minutes>  Test duration in minutes (default: 30)");
         Console.WriteLine("  -o, --output <directory>  Output directory for results (default: ./results)");
         Console.WriteLine("  -t, --tokens <count>      Max tokens per request (default: 250)");
@@ -109,9 +121,10 @@ static void DisplayHelp()
         Console.WriteLine("  -h, --help                Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  StressTest                          # 10 requests/min for 30 minutes");
-        Console.WriteLine("  StressTest -r 30 -d 15              # 30 requests/min for 15 minutes");
-        Console.WriteLine("  StressTest -r 5 -d 60 -t 500        # 5 requests/min for 1 hour, 500 tokens each");
+        Console.WriteLine("  StressTest                          # 10 sequential requests");
+        Console.WriteLine("  StressTest -r 100 -n 5             # 100 requests in batches of 5 concurrent");
+        Console.WriteLine("  StressTest -r 50 -n 1              # 50 sequential requests");
+        Console.WriteLine("  StressTest -r 20 -n 2 -t 500       # 20 requests, 2 at a time, 500 tokens each");
     Console.WriteLine("  StressTest -u http://192.168.1.100:11434 -r 20 -d 10");
 }
 
@@ -120,9 +133,9 @@ static void DisplayConfiguration(TestConfiguration config)
         Console.WriteLine("Configuration:");
         Console.WriteLine($"  Service URL: {config.BaseUrl}");
         Console.WriteLine($"  Container: {config.ContainerName}");
-        Console.WriteLine($"  Requests per minute: {config.RequestsPerMinute}");
-        Console.WriteLine($"  Test duration: {config.DurationMinutes} minutes");
-        Console.WriteLine($"  Total requests planned: {config.RequestsPerMinute * config.DurationMinutes}");
+        Console.WriteLine($"  Total requests: {config.TotalRequests}");
+        Console.WriteLine($"  Concurrent requests per batch: {config.ConcurrentRequests}");
+        Console.WriteLine($"  Total batches: {Math.Ceiling((double)config.TotalRequests / config.ConcurrentRequests)}");
         Console.WriteLine($"  Max tokens per request: {config.MaxTokens}");
         Console.WriteLine($"  Output directory: {config.OutputDirectory}");
         Console.WriteLine($"  Monitor container: {config.MonitorContainer}");

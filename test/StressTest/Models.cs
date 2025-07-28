@@ -110,12 +110,18 @@ public class TestConfiguration
 {
     public string BaseUrl { get; set; } = "http://localhost:11434";
     public string ContainerName { get; set; } = "tux-ai-service";
-    public int RequestsPerMinute { get; set; } = 10;
-    public int DurationMinutes { get; set; } = 30;
+    public int TotalRequests { get; set; } = 10;
+    public int ConcurrentRequests { get; set; } = 1;
     public int MaxTokens { get; set; } = 250;
     public bool MonitorContainer { get; set; } = true;
     public bool MonitorVM { get; set; } = true;
     public string OutputDirectory { get; set; } = "./results";
+    
+    // Legacy properties for backward compatibility with existing reports
+    [Obsolete("Use TotalRequests instead")]
+    public int RequestsPerMinute { get; set; } = 10;
+    [Obsolete("Use batch-based approach instead")]
+    public int DurationMinutes { get; set; } = 30;
 }
 
 public class BaselineMetrics

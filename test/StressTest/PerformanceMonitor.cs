@@ -322,13 +322,13 @@ public class PerformanceMonitor
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                // Read CPU usage from /proc/stat
+                // Use vmstat for current CPU usage - more accurate than /proc/stat snapshots
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "bash",
-                        Arguments = "-c \"grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$3+$4+$5)} END {print usage}'\"",
+                        Arguments = "-c \"vmstat 1 2 | tail -1\"",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         CreateNoWindow = true
@@ -339,9 +339,49 @@ public class PerformanceMonitor
                 var output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                if (double.TryParse(output.Trim(), out var cpuUsage))
+                if (!string.IsNullOrEmpty(output))
                 {
-                    return cpuUsage;
+                    // vmstat output: procs memory swap io system cpu
+                    // Last 3 columns are: us sy id (user, system, idle)
+                    var parts = output.Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 15)
+                    {
+                        // vmstat format: r b swpd free buff cache si so bi bo in cs us sy id wa st
+                        // We want columns: us (user), sy (system), id (idle)
+                        if (int.TryParse(parts[12], out var userCpu) &&  // us - user CPU
+                            int.TryParse(parts[13], out var systemCpu) && // sy - system CPU  
+                            int.TryParse(parts[14], out var idleCpu))     // id - idle CPU
+                        {
+                            var totalCpu = userCpu + systemCpu + idleCpu;
+                            if (totalCpu > 0)
+                            {
+                                double cpuUsage = (double)(userCpu + systemCpu) / totalCpu * 100.0;
+                                return Math.Max(0, Math.Min(100, cpuUsage));
+                            }
+                        }
+                    }
+                }
+
+                // Fallback to top command if vmstat fails
+                var topProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "bash",
+                        Arguments = "-c \"top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    }
+                };
+
+                topProcess.Start();
+                var topOutput = await topProcess.StandardOutput.ReadToEndAsync();
+                await topProcess.WaitForExitAsync();
+
+                if (!string.IsNullOrEmpty(topOutput) && double.TryParse(topOutput.Trim(), out var topCpuUsage))
+                {
+                    return Math.Max(0, Math.Min(100, topCpuUsage));
                 }
             }
             else
@@ -384,12 +424,13 @@ public class PerformanceMonitor
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
+                // Read memory usage from /proc/meminfo - CORRECTED for accurate VM memory calculation
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "bash",
-                        Arguments = "-c \"free -m | grep '^Mem:' | awk '{print $3}'\"",
+                        Arguments = "-c \"free -m | grep '^Mem:'\"",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         CreateNoWindow = true
@@ -400,9 +441,18 @@ public class PerformanceMonitor
                 var output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                if (long.TryParse(output.Trim(), out var memoryUsage))
+                if (!string.IsNullOrEmpty(output))
                 {
-                    return memoryUsage;
+                    // Parse free output: Mem: total used free shared buffers/cache available
+                    var parts = output.Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 3)
+                    {
+                        // parts[0] = "Mem:", parts[1] = total, parts[2] = used
+                        if (long.TryParse(parts[2], out var usedMemory))
+                        {
+                            return usedMemory; // Already in MB from 'free -m'
+                        }
+                    }
                 }
             }
         }
@@ -420,12 +470,13 @@ public class PerformanceMonitor
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
+                // Read disk usage from df - CORRECTED for accurate VM disk calculation  
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "bash",
-                        Arguments = "-c \"df -m / | tail -1 | awk '{print $3}'\"",
+                        Arguments = "-c \"df -m / | tail -1\"",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         CreateNoWindow = true
@@ -436,9 +487,18 @@ public class PerformanceMonitor
                 var output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                if (long.TryParse(output.Trim(), out var diskUsage))
+                if (!string.IsNullOrEmpty(output))
                 {
-                    return diskUsage;
+                    // Parse df output: Filesystem 1M-blocks Used Available Use% Mounted
+                    var parts = output.Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 3)
+                    {
+                        // parts[0] = filesystem, parts[1] = total, parts[2] = used
+                        if (long.TryParse(parts[2], out var usedDisk))
+                        {
+                            return usedDisk; // Already in MB from 'df -m'
+                        }
+                    }
                 }
             }
         }

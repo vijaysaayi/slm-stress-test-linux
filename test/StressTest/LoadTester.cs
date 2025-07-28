@@ -57,14 +57,15 @@ public class LoadTester
         var result = new TestResult
         {
             TestConfiguration = _config,
-            RequestsPerMinute = _config.RequestsPerMinute,
-            DurationMinutes = _config.DurationMinutes,
+            RequestsPerMinute = _config.TotalRequests, // Legacy field - reuse for total requests
+            DurationMinutes = _config.ConcurrentRequests, // Legacy field - reuse for concurrent requests
             StartTime = DateTime.UtcNow
         };
 
-        Console.WriteLine($"🚀 Starting stress test with baseline monitoring");
-        Console.WriteLine($"   Requests per minute: {_config.RequestsPerMinute}");
-        Console.WriteLine($"   Duration: {_config.DurationMinutes} minutes");
+        Console.WriteLine($"🚀 Starting batch-based stress test with baseline monitoring");
+        Console.WriteLine($"   Total requests: {_config.TotalRequests}");
+        Console.WriteLine($"   Concurrent requests per batch: {_config.ConcurrentRequests}");
+        Console.WriteLine($"   Total batches: {Math.Ceiling((double)_config.TotalRequests / _config.ConcurrentRequests)}");
         Console.WriteLine($"   Target URL: {_config.BaseUrl}");
         Console.WriteLine($"   Max tokens per request: {_config.MaxTokens}");
         Console.WriteLine();
@@ -172,62 +173,75 @@ public class LoadTester
 
     private async Task RunActualStressTestAsync(TestResult result)
     {
-        var testDuration = TimeSpan.FromMinutes(_config.DurationMinutes);
-        var totalRequests = _config.RequestsPerMinute * _config.DurationMinutes;
-        var requestInterval = testDuration.TotalMilliseconds / totalRequests;
-
-        Console.WriteLine($"   Total requests planned: {totalRequests}");
-        Console.WriteLine($"   Request interval: {requestInterval:F0}ms");
+        var totalBatches = (int)Math.Ceiling((double)_config.TotalRequests / _config.ConcurrentRequests);
+        
+        Console.WriteLine($"   Total requests planned: {_config.TotalRequests}");
+        Console.WriteLine($"   Requests per batch: {_config.ConcurrentRequests}");
+        Console.WriteLine($"   Total batches: {totalBatches}");
         Console.WriteLine();
 
-        var cancellationTokenSource = new CancellationTokenSource(testDuration);
-        var requestTasks = new List<Task>();
         var requestResults = new List<RequestResult>();
         var performanceMetrics = new List<PerformanceMetrics>();
+        var requestCounter = 0;
 
         // Start performance monitoring
+        var cancellationTokenSource = new CancellationTokenSource();
         var monitoringTask = MonitorPerformanceAsync(performanceMetrics, cancellationTokenSource.Token);
 
-        // Schedule requests
-        for (int i = 0; i < totalRequests; i++)
+        try
         {
-            var requestIndex = i;
-            var delay = TimeSpan.FromMilliseconds(requestInterval * i);
-            
-            var requestTask = Task.Run(async () =>
+            // Execute requests in batches
+            for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++)
             {
-                await Task.Delay(delay, cancellationTokenSource.Token);
+                var batchStartTime = DateTime.UtcNow;
+                var requestsInThisBatch = Math.Min(_config.ConcurrentRequests, _config.TotalRequests - requestCounter);
                 
-                if (!cancellationTokenSource.Token.IsCancellationRequested)
+                Console.WriteLine($"🔥 Executing batch {batchIndex + 1}/{totalBatches} with {requestsInThisBatch} concurrent requests...");
+
+                // Create tasks for this batch
+                var batchTasks = new List<Task<RequestResult>>();
+                for (int i = 0; i < requestsInThisBatch; i++)
                 {
-                    var requestResult = await MakeRequestAsync(requestIndex + 1);
-                    lock (requestResults)
-                    {
-                        requestResults.Add(requestResult);
-                    }
+                    var requestIndex = requestCounter + i + 1;
+                    var requestTask = MakeRequestAsync(requestIndex);
+                    batchTasks.Add(requestTask);
                 }
-            }, cancellationTokenSource.Token);
 
-            requestTasks.Add(requestTask);
-        }
+                // Wait for all requests in this batch to complete
+                var batchResults = await Task.WhenAll(batchTasks);
+                requestResults.AddRange(batchResults);
+                requestCounter += requestsInThisBatch;
 
-        // Wait for all requests to complete or timeout
-        try
-        {
-            await Task.WhenAll(requestTasks);
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine("   ⚠️  Some requests were cancelled due to timeout");
-        }
+                var batchDuration = DateTime.UtcNow - batchStartTime;
+                var successfulInBatch = batchResults.Count(r => r.Success);
+                var avgResponseTimeInBatch = batchResults.Average(r => r.ResponseTime.TotalSeconds);
+                
+                Console.WriteLine($"   ✅ Batch {batchIndex + 1} completed in {batchDuration.TotalSeconds:F1}s");
+                Console.WriteLine($"      Success rate: {successfulInBatch}/{requestsInThisBatch} ({(double)successfulInBatch / requestsInThisBatch * 100:F1}%)");
+                Console.WriteLine($"      Avg response time: {avgResponseTimeInBatch:F1}s");
+                Console.WriteLine($"      Total completed: {requestCounter}/{_config.TotalRequests}");
+                Console.WriteLine();
 
-        // Stop monitoring
-        cancellationTokenSource.Cancel();
-        try
-        {
-            await monitoringTask;
+                // Small delay between batches to let system settle
+                if (batchIndex < totalBatches - 1)
+                {
+                    await Task.Delay(500);
+                }
+            }
         }
-        catch (OperationCanceledException) { }
+        finally
+        {
+            // Stop performance monitoring
+            cancellationTokenSource.Cancel();
+            try
+            {
+                await monitoringTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when cancelling
+            }
+        }
 
         result.RequestResults = requestResults.OrderBy(r => r.Timestamp).ToList();
         result.Requests = result.RequestResults; // Backward compatibility
@@ -588,6 +602,35 @@ public class LoadTester
             Console.WriteLine($"Container Memory increase: {containerMemoryDelta:+N0;-N0;0} MB ({GetResourceImpactDescription(containerMemoryDelta, "Memory")})");
             Console.WriteLine($"VM CPU increase: {vmCpuDelta:+F1;-F1;0}% ({GetResourceImpactDescription(vmCpuDelta, "CPU")})");
             Console.WriteLine($"VM Memory increase: {vmMemoryDelta:+N0;-N0;0} MB ({GetResourceImpactDescription(vmMemoryDelta, "Memory")})");
+            Console.WriteLine();
+
+            // *** CO-TENANCY BUSINESS ANALYSIS ***
+            Console.WriteLine($"🏢 CO-TENANCY BUSINESS ANALYSIS:");
+            Console.WriteLine($"================================");
+            Console.WriteLine($"🎯 SLM VM CPU Impact: {vmCpuDelta:F1}% (Target: <20% for safe co-tenancy)");
+            Console.WriteLine($"🏠 VM CPU Available for Customers: {100 - result.Statistics.MaxVmCpuUsage:F1}%");
+            
+            if (vmCpuDelta <= 20)
+            {
+                Console.WriteLine($"✅ BUSINESS DECISION: SAFE FOR CO-TENANCY");
+                Console.WriteLine($"   • SLM consumes ≤20% VM CPU - customer apps will have sufficient resources");
+                Console.WriteLine($"   • Deploy SLM + customer applications on shared VMs");
+                Console.WriteLine($"   • Maximize cost efficiency without resource starvation");
+            }
+            else if (vmCpuDelta <= 35)
+            {
+                Console.WriteLine($"⚠️  BUSINESS DECISION: RISKY CO-TENANCY");
+                Console.WriteLine($"   • SLM consumes {vmCpuDelta:F1}% VM CPU - above 20% safe threshold");
+                Console.WriteLine($"   • Customer applications may experience performance degradation");
+                Console.WriteLine($"   • Consider: Monitor customer app performance closely or use dedicated VMs");
+            }
+            else
+            {
+                Console.WriteLine($"❌ BUSINESS DECISION: UNSAFE FOR CO-TENANCY");
+                Console.WriteLine($"   • SLM consumes {vmCpuDelta:F1}% VM CPU - will starve customer applications");
+                Console.WriteLine($"   • Require dedicated SLM VMs to protect customer performance");
+                Console.WriteLine($"   • Higher infrastructure cost but guaranteed customer app performance");
+            }
             Console.WriteLine();
 
             // Recovery analysis

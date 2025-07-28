@@ -228,6 +228,18 @@ namespace StressTest
             text-align: center;
         }}
 
+        .section-description {{
+            text-align: left;
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            color: #555;
+            line-height: 1.6;
+        }}
+
         .section ul {{
             text-align: left;
             display: inline-block;
@@ -570,41 +582,44 @@ namespace StressTest
                 <div class=""metric-label"">Avg Container Memory</div>
             </div>
             
-            <!-- Row 3: VM Level Metrics -->
-            <div class=""section-header"">🖥️ Virtual Machine Level Metrics</div>
+            <!-- Row 3: Load Added to VM During SLM Inference -->
+            <div class=""section-header"">� Load Added to VM During SLM Inference</div>
             
             <div class=""metric-card"">
                 <div class=""info-icon"" onclick=""toggleTooltip(this)"">i</div>
                 <div class=""tooltip"">
-                    <strong>Average VM CPU Usage:</strong> Mean CPU utilization on the host virtual machine.<br><br>
-                    <strong>Measured:</strong> {result.Statistics.AvgVmCpuUsage:F1}% average usage<br>
-                    <strong>Peak:</strong> {result.Statistics.MaxVmCpuUsage:F1}%<br>
-                    <strong>Includes:</strong> Container overhead, OS processes, and background tasks
+                    <strong>VM CPU Load Increase:</strong> Additional CPU usage added by SLM inference compared to baseline.<br><br>
+                    <strong>Calculation:</strong> Peak SLM Usage - Pre-Test Baseline<br>
+                    <strong>Baseline VM CPU:</strong> <span id=""baseline-vm-cpu"">N/A</span><br>
+                    <strong>Peak During Test:</strong> {result.Statistics.MaxVmCpuUsage:F1}%<br>
+                    <strong>SLM Impact:</strong> <span id=""vm-cpu-delta"">Calculating...</span>
                 </div>
-                <div class=""metric-value {(result.Statistics.AvgVmCpuUsage <= 70 ? "success" : result.Statistics.AvgVmCpuUsage <= 85 ? "warning" : "danger")}"">{result.Statistics.AvgVmCpuUsage:F1}%</div>
-                <div class=""metric-label"">Avg VM CPU Usage</div>
+                <div class=""metric-value"" id=""vm-cpu-impact-value"">Calculating...</div>
+                <div class=""metric-label"">VM CPU Load Added</div>
             </div>
             <div class=""metric-card"">
                 <div class=""info-icon"" onclick=""toggleTooltip(this)"">i</div>
                 <div class=""tooltip"">
-                    <strong>Average VM Memory %:</strong> Percentage of total VM RAM being used.<br><br>
-                    <strong>Calculation:</strong> ({result.Statistics.AvgVmMemoryUsage:N0} MB used ÷ Total VM RAM) × 100<br>
-                    <strong>Peak:</strong> {result.Statistics.MaxVmMemoryUsage:N0} MB<br>
-                    <strong>Note:</strong> Actual percentage depends on total VM RAM capacity
+                    <strong>VM Memory Load Increase:</strong> Additional memory usage added by SLM inference compared to baseline.<br><br>
+                    <strong>Calculation:</strong> Peak SLM Memory - Pre-Test Baseline Memory<br>
+                    <strong>Baseline VM Memory:</strong> <span id=""baseline-vm-memory"">N/A</span> MB<br>
+                    <strong>Peak During Test:</strong> {result.Statistics.MaxVmMemoryUsage:N0} MB<br>
+                    <strong>SLM Impact:</strong> <span id=""vm-memory-delta"">Calculating...</span> MB
                 </div>
-                <div class=""metric-value info"">{(result.Statistics.AvgVmMemoryUsage / 1024.0 * 100 / 64):F1}%</div>
-                <div class=""metric-label"">Avg VM Memory %</div>
+                <div class=""metric-value"" id=""vm-memory-impact-value"">Calculating...</div>
+                <div class=""metric-label"">VM Memory Added</div>
             </div>
             <div class=""metric-card"">
                 <div class=""info-icon"" onclick=""toggleTooltip(this)"">i</div>
                 <div class=""tooltip"">
-                    <strong>Actual VM Memory Used:</strong> Absolute amount of RAM consumed on the virtual machine.<br><br>
-                    <strong>Average:</strong> {result.Statistics.AvgVmMemoryUsage:N0} MB<br>
-                    <strong>Peak:</strong> {result.Statistics.MaxVmMemoryUsage:N0} MB<br>
-                    <strong>Includes:</strong> Container memory, OS memory, and system overhead
+                    <strong>Actual Memory Added:</strong> Absolute amount of additional RAM consumed by SLM inference.<br><br>
+                    <strong>Calculation:</strong> Peak Test Memory - Baseline Memory<br>
+                    <strong>Before SLM:</strong> <span id=""baseline-vm-memory-abs"">N/A</span> MB<br>
+                    <strong>During SLM:</strong> {result.Statistics.MaxVmMemoryUsage:N0} MB<br>
+                    <strong>Additional Load:</strong> <span id=""vm-memory-added"">Calculating...</span> MB
                 </div>
-                <div class=""metric-value info"">{result.Statistics.AvgVmMemoryUsage:N0} MB</div>
-                <div class=""metric-label"">Actual VM Memory Used</div>
+                <div class=""metric-value"" id=""vm-memory-added-value"">Calculating...</div>
+                <div class=""metric-label"">Actual Memory Added</div>
             </div>
         </div>
 
@@ -647,6 +662,12 @@ namespace StressTest
 
         <div class=""section"">
             <h2>📊 Performance Metrics</h2>
+            <p class=""section-description"">
+                The charts below show individual request performance and system resource correlation. 
+                The <strong>Individual Request Performance</strong> chart displays each request's response time and tokens generated, 
+                allowing you to identify patterns and outliers. The <strong>Response Time vs System Resource Usage</strong> chart 
+                correlates response times with CPU usage to help understand performance bottlenecks.
+            </p>
             <div class=""charts-grid"">
                 <div class=""chart-container"">
                     <h3>Response Time Distribution</h3>
@@ -663,12 +684,12 @@ namespace StressTest
                     <canvas id=""vmResourceChart""></canvas>
                 </div>
                 <div class=""chart-container"">
-                    <h3>Performance Timeline</h3>
+                    <h3>Individual Request Performance</h3>
                     <canvas id=""timelineChart""></canvas>
                 </div>
             </div>
             <div class=""chart-container full-width-chart"">
-                <h3>Complete Performance Metrics Over Time</h3>
+                <h3>Response Time vs System Resource Usage Over Time</h3>
                 <canvas id=""detailedMetricsChart""></canvas>
             </div>
         </div>
@@ -742,6 +763,7 @@ namespace StressTest
 
         function generateRecommendation() {{
             const stats = testData.statistics;
+            const baseline = testData.preTestBaseline;
             const content = document.getElementById('recommendation-content');
             
             if (!content) {{
@@ -749,65 +771,77 @@ namespace StressTest
                 return;
             }}
             
-            let recommendation = '';
-            let performanceLevel = '';
+            // Calculate SLM's actual VM impact for co-tenancy assessment
+            const slmVmImpact = baseline ? stats.maxVmCpuUsage - baseline.avgVmCpuUsage : stats.maxVmCpuUsage;
+            const slmMemoryImpact = baseline ? stats.maxVmMemoryUsage - baseline.avgVmMemoryUsage : 0;
             
-            // Determine overall performance
-            if (stats.successRate >= 95 && parseTimeSpan(stats.averageResponseTime) <= 20 && stats.maxVmCpuUsage <= 70) {{
-                performanceLevel = '🟢 EXCELLENT';
-                recommendation = `
-                    <div class=""performance-indicator excellent"">RECOMMENDED FOR PRODUCTION</div>
-                    <p><strong>The SLM performs excellently on VM infrastructure:</strong></p>
-                    <ul>
-                        <li>✅ High success rate (${{stats.successRate.toFixed(1)}}%) indicates reliable service</li>
-                        <li>✅ Fast response times (avg ${{parseTimeSpan(stats.averageResponseTime).toFixed(1)}}s) provide good user experience</li>
-                        <li>✅ Efficient VM resource usage (peak VM CPU ${{stats.maxVmCpuUsage.toFixed(1)}}%) allows for scaling</li>
-                        <li>✅ Container efficiently utilizes resources (peak container CPU ${{stats.maxCpuUsage.toFixed(1)}}%)</li>
-                        <li>✅ Strong throughput (${{stats.tokensPerSecond.toFixed(1)}} tokens/sec) supports concurrent users</li>
-                    </ul>
-                    <p><strong>Recommendation:</strong> Proceed with VM deployment. Consider horizontal scaling for increased load.</p>
-                `;
-            }} else if (stats.successRate >= 90 && parseTimeSpan(stats.averageResponseTime) <= 60 && stats.maxVmCpuUsage <= 85) {{
-                performanceLevel = '🟡 GOOD';
-                recommendation = `
-                    <div class=""performance-indicator good"">ACCEPTABLE WITH OPTIMIZATION</div>
-                    <p><strong>The SLM shows good performance with room for improvement:</strong></p>
-                    <ul>
-                        <li>${{stats.successRate >= 95 ? '✅' : '⚠️'}} Success rate: ${{stats.successRate.toFixed(1)}}%</li>
-                        <li>${{parseTimeSpan(stats.averageResponseTime) <= 20 ? '✅' : '⚠️'}} Response time: ${{parseTimeSpan(stats.averageResponseTime).toFixed(1)}}s</li>
-                        <li>${{stats.maxVmCpuUsage <= 70 ? '✅' : '⚠️'}} VM CPU usage: ${{stats.maxVmCpuUsage.toFixed(1)}}% ${{stats.maxVmCpuUsage > 70 ? '(High but manageable)' : ''}}</li>
-                        <li>ℹ️ Container CPU usage: ${{stats.maxCpuUsage.toFixed(1)}}% (Normal for AI workloads)</li>
-                        <li>✅ Throughput: ${{stats.tokensPerSecond.toFixed(1)}} tokens/sec</li>
-                    </ul>
-                    <p><strong>Recommendation:</strong> Suitable for production with monitoring. Consider VM scaling if needed.</p>
-                `;
+            let recommendation = '';
+            let coTenancyLevel = '';
+            
+            // Co-tenancy assessment based on SLM's VM impact
+            if (slmVmImpact <= 20 && stats.successRate >= 95) {{
+                coTenancyLevel = '🟢 EXCELLENT CO-TENANCY';
+                recommendation = 
+                    '<div class=""performance-indicator excellent"">✅ SAFE FOR CO-TENANCY</div>' +
+                    '<p><strong>SLM Impact Analysis - IDEAL for customer applications:</strong></p>' +
+                    '<ul>' +
+                        '<li>🎯 <strong>SLM VM Impact: ' + slmVmImpact.toFixed(1) + '%</strong> (Target: &lt;20% ✅)</li>' +
+                        '<li>🏠 VM Resources Available: ' + (100 - stats.maxVmCpuUsage).toFixed(1) + '% CPU remaining for customer apps</li>' +
+                        '<li>✅ High success rate (' + stats.successRate.toFixed(1) + '%) ensures reliable AI service</li>' +
+                        '<li>⚡ Response time: ' + parseTimeSpan(stats.averageResponseTime).toFixed(1) + 's ' + (parseTimeSpan(stats.averageResponseTime) <= 180 ? '(excellent user experience)' : '(acceptable for AI workloads)') + '</li>' +
+                        '<li>📊 Memory impact: ' + (slmMemoryImpact > 0 ? '+' + slmMemoryImpact.toFixed(0) + 'MB' : 'minimal') + '</li>' +
+                    '</ul>' +
+                    '<p><strong>🎯 Business Decision:</strong> <span style=""color: green; font-weight: bold;"">Deploy SLM + customer applications on shared VMs</span></p>' +
+                    '<p>💰 <strong>Cost Efficiency:</strong> Maximize VM utilization without resource starvation</p>';
+            }} else if (slmVmImpact <= 35 && stats.successRate >= 90) {{
+                coTenancyLevel = '🟡 MODERATE CO-TENANCY';
+                recommendation = 
+                    '<div class=""performance-indicator good"">⚠️ RISKY CO-TENANCY</div>' +
+                    '<p><strong>SLM Impact Analysis - MONITOR customer application performance:</strong></p>' +
+                    '<ul>' +
+                        '<li>⚠️ <strong>SLM VM Impact: ' + slmVmImpact.toFixed(1) + '%</strong> (Target: &lt;20% ❌)</li>' +
+                        '<li>🏠 VM Resources Available: ' + (100 - stats.maxVmCpuUsage).toFixed(1) + '% CPU remaining for customer apps</li>' +
+                        '<li>' + (stats.successRate >= 95 ? '✅' : '⚠️') + ' Success rate: ' + stats.successRate.toFixed(1) + '%</li>' +
+                        '<li>⚡ Response time: ' + parseTimeSpan(stats.averageResponseTime).toFixed(1) + 's ' + (parseTimeSpan(stats.averageResponseTime) <= 180 ? '(healthy)' : '(slow - consider optimization)') + '</li>' +
+                        '<li>📊 Memory impact: ' + (slmMemoryImpact > 0 ? '+' + slmMemoryImpact.toFixed(0) + 'MB' : 'minimal') + '</li>' +
+                    '</ul>' +
+                    '<p><strong>🎯 Business Decision:</strong> <span style=""color: orange; font-weight: bold;"">Careful co-tenancy with performance monitoring</span></p>' +
+                    '<p>⚠️ <strong>Risk Assessment:</strong> Customer apps may experience performance degradation during peak SLM usage</p>';
             }} else {{
-                performanceLevel = '🔴 NEEDS IMPROVEMENT';
-                recommendation = `
-                    <div class=""performance-indicator poor"">REQUIRES OPTIMIZATION</div>
-                    <p><strong>The SLM performance indicates potential issues:</strong></p>
-                    <ul>
-                        <li>${{stats.successRate >= 90 ? '✅' : '❌'}} Success rate: ${{stats.successRate.toFixed(1)}}% ${{stats.successRate < 90 ? '(Below recommended 90%)' : ''}}</li>
-                        <li>${{parseTimeSpan(stats.averageResponseTime) <= 60 ? '✅' : '❌'}} Response time: ${{parseTimeSpan(stats.averageResponseTime).toFixed(1)}}s ${{parseTimeSpan(stats.averageResponseTime) > 60 ? '(Too slow for user experience)' : ''}}</li>
-                        <li>${{stats.maxVmCpuUsage <= 85 ? '✅' : '❌'}} VM CPU usage: ${{stats.maxVmCpuUsage.toFixed(1)}}% ${{stats.maxVmCpuUsage > 85 ? '(VM resource constrained)' : ''}}</li>
-                        <li>ℹ️ Container CPU usage: ${{stats.maxCpuUsage.toFixed(1)}}% (Expected for AI inference)</li>
-                    </ul>
-                    <p><strong>Recommendation:</strong> ${{stats.maxVmCpuUsage > 85 ? 'Upgrade VM or reduce load.' : 'Optimize model or response times.'}}</p>
-                `;
+                coTenancyLevel = '🔴 POOR CO-TENANCY';
+                recommendation = 
+                    '<div class=""performance-indicator poor"">❌ UNSAFE FOR CO-TENANCY</div>' +
+                    '<p><strong>SLM Impact Analysis - WILL STARVE customer applications:</strong></p>' +
+                    '<ul>' +
+                        '<li>❌ <strong>SLM VM Impact: ' + slmVmImpact.toFixed(1) + '%</strong> (Target: &lt;20% ❌)</li>' +
+                        '<li>⚠️ VM Resources Available: ' + (100 - stats.maxVmCpuUsage).toFixed(1) + '% CPU remaining (insufficient)</li>' +
+                        '<li>' + (stats.successRate >= 90 ? '✅' : '❌') + ' Success rate: ' + stats.successRate.toFixed(1) + '%</li>' +
+                        '<li>⚡ Response time: ' + parseTimeSpan(stats.averageResponseTime).toFixed(1) + 's ' + (parseTimeSpan(stats.averageResponseTime) <= 180 ? '(acceptable)' : '(too slow - requires optimization)') + '</li>' +
+                        '<li>📊 Memory impact: ' + (slmMemoryImpact > 0 ? '+' + slmMemoryImpact.toFixed(0) + 'MB' : 'minimal') + '</li>' +
+                    '</ul>' +
+                    '<p><strong>🎯 Business Decision:</strong> <span style=""color: red; font-weight: bold;"">Require dedicated SLM VMs</span></p>' +
+                    '<p>💸 <strong>Cost Impact:</strong> Higher infrastructure cost but guaranteed customer app performance</p>' +
+                    '<p><strong>Recommendation:</strong> ' + (stats.maxVmCpuUsage > 80 ? 'Scale up VM size or reduce SLM load' : 'Optimize SLM model or deployment configuration') + '</p>';
             }}
             
-            content.innerHTML = `
-                <div style=""margin-bottom: 20px;"">
-                    <h4>${{performanceLevel}}</h4>
-                </div>
-                ${{recommendation}}
-                <div style=""margin-top: 20px; padding: 15px; background: #ecf0f1; border-radius: 8px;"">
-                    <strong>Key Metrics for Decision Making:</strong><br>
-                    • Cost per token: ~${{(1/stats.tokensPerSecond * 0.001).toFixed(4)}} (estimated)<br>
-                    • VM utilization: ${{((stats.maxVmCpuUsage + stats.maxVmMemoryUsage/100)/2).toFixed(1)}}% average resource usage<br>
-                    • Scalability factor: ${{(100 - stats.maxVmCpuUsage).toFixed(0)}}% headroom for additional load
-                </div>
-            `;
+            content.innerHTML = 
+                '<div style=""margin-bottom: 20px;"">' +
+                    '<h4>' + coTenancyLevel + '</h4>' +
+                '</div>' +
+                recommendation +
+                '<div style=""margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #007bff; font-size: 0.9em;"">' +
+                    '<strong>📋 Co-Tenancy Guidelines:</strong><br>' +
+                    '• <strong>&lt;20% SLM Impact:</strong> Safe for shared VMs with customer applications<br>' +
+                    '• <strong>20-35% SLM Impact:</strong> Risky - monitor customer app performance closely<br>' +
+                    '• <strong>&gt;35% SLM Impact:</strong> Requires dedicated SLM infrastructure<br>' +
+                    '<br>' +
+                    '<strong>Performance Thresholds:</strong><br>' +
+                    '• <strong>Response Time &lt;3min (180s):</strong> Healthy for AI workloads<br>' +
+                    '• <strong>Success Rate &gt;90%:</strong> Acceptable reliability<br>' +
+                    '• <strong>Container CPU ' + stats.maxCpuUsage.toFixed(1) + '%:</strong> Normal for AI inference<br>' +
+                    '<br>' +
+                    '<em>Focus on VM CPU impact for co-tenancy business decisions.</em>' +
+                '</div>';
         }}
 
         function populateBaselineComparison() {{
@@ -882,10 +916,10 @@ namespace StressTest
                     const preTest = testData.preTestBaseline;
                     const postTest = testData.postTestBaseline;
                     
-                    const containerCpuDelta = stats.averageCpuUsage - preTest.avgContainerCpuUsage;
-                    const containerMemoryDelta = stats.averageMemoryUsage - preTest.avgContainerMemoryUsage;
-                    const vmCpuDelta = stats.avgVmCpuUsage - preTest.avgVmCpuUsage;
-                    const vmMemoryDelta = stats.avgVmMemoryUsage - preTest.avgVmMemoryUsage;
+                    const containerCpuDelta = stats.maxCpuUsage - preTest.avgContainerCpuUsage;
+                    const containerMemoryDelta = stats.maxMemoryUsage - preTest.avgContainerMemoryUsage;
+                    const vmCpuDelta = stats.maxVmCpuUsage - preTest.avgVmCpuUsage;
+                    const vmMemoryDelta = stats.maxVmMemoryUsage - preTest.avgVmMemoryUsage;
                     
                     const cpuRecovered = Math.abs(postTest.avgContainerCpuUsage - preTest.avgContainerCpuUsage) < 2.0;
                     const memoryRecovered = Math.abs(postTest.avgContainerMemoryUsage - preTest.avgContainerMemoryUsage) < 50;
@@ -952,6 +986,77 @@ namespace StressTest
                     `;
                 }}
             }}
+            
+            // Populate VM Impact metrics in the main metrics section
+            populateVmImpactMetrics();
+        }}
+
+        function populateVmImpactMetrics() {{
+            const stats = testData.statistics;
+            const preTest = testData.preTestBaseline;
+            
+            if (preTest) {{
+                // Calculate VM CPU impact
+                const vmCpuDelta = stats.maxVmCpuUsage - preTest.avgVmCpuUsage;
+                const vmCpuAbsoluteIncrease = vmCpuDelta; // Absolute CPU percentage points added
+                
+                // Calculate VM Memory impact
+                const vmMemoryDelta = stats.maxVmMemoryUsage - preTest.avgVmMemoryUsage;
+                const vmMemoryAbsoluteIncrease = vmMemoryDelta; // Absolute memory MB added
+                
+                // Update baseline values in tooltips
+                document.getElementById('baseline-vm-cpu').textContent = preTest.avgVmCpuUsage.toFixed(1) + '%';
+                document.getElementById('baseline-vm-memory').textContent = preTest.avgVmMemoryUsage.toLocaleString();
+                document.getElementById('baseline-vm-memory-abs').textContent = preTest.avgVmMemoryUsage.toLocaleString();
+                
+                // Update delta values in tooltips
+                document.getElementById('vm-cpu-delta').textContent = (vmCpuDelta > 0 ? '+' : '') + vmCpuDelta.toFixed(2) + '% CPU load added';
+                document.getElementById('vm-memory-delta').textContent = (vmMemoryDelta > 0 ? '+' : '') + vmMemoryDelta.toFixed(0);
+                document.getElementById('vm-memory-added').textContent = (vmMemoryDelta > 0 ? '+' : '') + vmMemoryDelta.toFixed(0);
+                
+                // Update main metric values
+                const cpuImpactElement = document.getElementById('vm-cpu-impact-value');
+                const memoryImpactElement = document.getElementById('vm-memory-impact-value');
+                const memoryAddedElement = document.getElementById('vm-memory-added-value');
+                
+                if (cpuImpactElement) {{
+                    cpuImpactElement.textContent = (vmCpuAbsoluteIncrease > 0 ? '+' : '') + vmCpuAbsoluteIncrease.toFixed(1) + '%';
+                    cpuImpactElement.className = 'metric-value ' + getImpactCssClass(vmCpuAbsoluteIncrease, 'cpu');
+                }}
+                
+                if (memoryImpactElement) {{
+                    memoryImpactElement.textContent = (vmMemoryAbsoluteIncrease > 0 ? '+' : '') + vmMemoryAbsoluteIncrease.toFixed(0) + ' MB';
+                    memoryImpactElement.className = 'metric-value ' + getImpactCssClass(vmMemoryAbsoluteIncrease, 'memory');
+                }}
+                
+                if (memoryAddedElement) {{
+                    memoryAddedElement.textContent = (vmMemoryDelta > 0 ? '+' : '') + vmMemoryDelta.toFixed(0) + ' MB';
+                    memoryAddedElement.className = 'metric-value ' + getImpactCssClass(vmMemoryDelta, 'memory');
+                }}
+            }} else {{
+                // No baseline available
+                document.getElementById('vm-cpu-impact-value').textContent = 'No Baseline';
+                document.getElementById('vm-memory-impact-value').textContent = 'No Baseline';
+                document.getElementById('vm-memory-added-value').textContent = 'No Baseline';
+            }}
+        }}
+        
+        function getImpactCssClass(value, type) {{
+            if (type === 'percentage') {{
+                if (value <= 5) return 'success';   // Green for low impact
+                if (value <= 15) return 'warning';  // Orange for moderate impact
+                return 'danger';                    // Red for high impact
+            }} else if (type === 'cpu') {{
+                // For absolute CPU percentage points added (e.g., 4.2% means 4.2 percentage points)
+                if (value <= 10) return 'success';  // Green for low CPU impact (<10% points)
+                if (value <= 25) return 'warning';  // Orange for moderate CPU impact (10-25% points)
+                return 'danger';                    // Red for high CPU impact (>25% points)
+            }} else if (type === 'memory') {{
+                if (value <= 50) return 'success';  // Green for low memory impact
+                if (value <= 200) return 'warning'; // Orange for moderate memory impact
+                return 'danger';                    // Red for high memory impact
+            }}
+            return 'info';
         }}
 
         function populateRequestsTable() {{
@@ -1284,7 +1389,7 @@ namespace StressTest
                 }}
             }});
 
-            // Performance Timeline Chart (Response Times)
+            // Individual Request Performance Chart
             const timelineCanvas = document.getElementById('timelineChart');
             if (!timelineCanvas) {{
                 console.warn('Timeline chart canvas not found');
@@ -1292,33 +1397,92 @@ namespace StressTest
             }}
             const timelineCtx = timelineCanvas.getContext('2d');
             
+            // Prepare per-request data
+            const requestNumbers = testData.requestResults.map((_, i) => i + 1);
+            const individualResponseTimes = testData.requestResults.map(r => parseTimeSpan(r.responseTime));
+            const tokensGenerated = testData.requestResults.map(r => r.tokensGenerated || 0);
+            
             new Chart(timelineCtx, {{
                 type: 'line',
                 data: {{
-                    labels: requestLabels.length > 100 ? requestLabels.filter((_, i) => i % Math.ceil(requestLabels.length / 100) === 0) : requestLabels,
+                    labels: requestNumbers.length > 100 ? requestNumbers.filter((_, i) => i % Math.ceil(requestNumbers.length / 100) === 0) : requestNumbers,
                     datasets: [{{
-                        label: 'Response Time (ms)',
-                        data: responseTimes.length > 100 ? responseTimes.filter((_, i) => i % Math.ceil(responseTimes.length / 100) === 0) : responseTimes,
+                        label: 'Response Time (seconds)',
+                        data: individualResponseTimes.length > 100 ? individualResponseTimes.filter((_, i) => i % Math.ceil(individualResponseTimes.length / 100) === 0) : individualResponseTimes,
                         borderColor: 'rgba(52, 152, 219, 1)',
                         backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        tension: 0.4,
-                        fill: true
+                        tension: 0.1,
+                        fill: false,
+                        yAxisID: 'y'
+                    }}, {{
+                        label: 'Tokens Generated',
+                        data: tokensGenerated.length > 100 ? tokensGenerated.filter((_, i) => i % Math.ceil(tokensGenerated.length / 100) === 0) : tokensGenerated,
+                        borderColor: 'rgba(46, 204, 113, 1)',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        tension: 0.1,
+                        fill: false,
+                        yAxisID: 'y1'
                     }}]
                 }},
                 options: {{
                     responsive: true,
+                    interaction: {{
+                        mode: 'index',
+                        intersect: false,
+                    }},
                     scales: {{
+                        x: {{
+                            display: true,
+                            title: {{
+                                display: true,
+                                text: 'Request Number'
+                            }}
+                        }},
                         y: {{
-                            beginAtZero: true,
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
                             title: {{
                                 display: true,
                                 text: 'Response Time (seconds)'
-                            }}
+                            }},
+                            beginAtZero: true
                         }},
-                        x: {{
+                        y1: {{
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
                             title: {{
                                 display: true,
-                                text: 'Time'
+                                text: 'Tokens Generated'
+                            }},
+                            beginAtZero: true,
+                            grid: {{
+                                drawOnChartArea: false,
+                            }},
+                        }}
+                    }},
+                    plugins: {{
+                        tooltip: {{
+                            callbacks: {{
+                                afterBody: function(context) {{
+                                    const index = context[0].dataIndex;
+                                    const realIndex = requestNumbers.length > 100 ? 
+                                        Math.floor(index * (requestNumbers.length / 100)) : index;
+                                    if (realIndex < testData.requestResults.length) {{
+                                        const request = testData.requestResults[realIndex];
+                                        const responseTime = parseTimeSpan(request.responseTime);
+                                        const tokens = request.tokensGenerated || 0;
+                                        const success = request.success ? '✅ Success' : '❌ Failed';
+                                        return [
+                                            `Status: ${{success}}`,
+                                            `Response Time: ${{responseTime.toFixed(2)}}s`,
+                                            `Tokens Generated: ${{tokens}}`,
+                                            `Time: ${{new Date(request.timestamp).toLocaleTimeString()}}`
+                                        ];
+                                    }}
+                                    return [];
+                                }}
                             }}
                         }}
                     }}
